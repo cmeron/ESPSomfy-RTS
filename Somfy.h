@@ -405,6 +405,8 @@ class SomfyGroup : public SomfyRemote {
     static void unpublish(uint8_t id);
     static void unpublish(uint8_t id, const char *topic);
     void publishState();
+    void publishDisco();
+    void unpublishDisco();
     void updateFlags();
     void emitState(const char *evt = "groupState");
     void emitState(uint8_t num, const char *evt = "groupState");

@@ -1631,6 +1631,51 @@ void SomfyGroup::publishState() {
     this->publish("windy", isWindy);    
   }  
 }
+void SomfyGroup::publishDisco() {
+  if(!mqtt.connected() || !settings.MQTT.pubDisco) return;
+  char topic[128] = "";
+  DynamicJsonDocument doc(2048);
+  JsonObject obj = doc.to<JsonObject>();
+  snprintf(topic, sizeof(topic), "%s/groups/%d", settings.MQTT.rootTopic, this->groupId);
+  obj["~"] = topic;
+  JsonObject dobj = obj.createNestedObject("device");
+  dobj["hw_version"] = settings.fwVersion.name;
+  dobj["name"] = settings.hostname;
+  dobj["mf"] = "rstrouse";
+  JsonArray arrids = dobj.createNestedArray("identifiers");
+  snprintf(topic, sizeof(topic), "mqtt_espsomfyrts_%s", settings.serverId);
+  arrids.add(topic);
+  dobj["via_device"] = topic;
+  dobj["model"] = "ESPSomfy-RTS MQTT";
+  snprintf(topic, sizeof(topic), "%s/status", settings.MQTT.rootTopic);
+  obj["availability_topic"] = topic;
+  obj["payload_available"] = "online";
+  obj["payload_not_available"] = "offline";
+  obj["name"] = this->name;
+  snprintf(topic, sizeof(topic), "mqtt_%s_group%d", settings.serverId, this->groupId);
+  obj["unique_id"] = topic;
+  obj["device_class"] = "shade";
+  obj["command_topic"] = "~/direction/set";
+  obj["payload_open"] = this->flipCommands ? "1" : "-1";
+  obj["payload_close"] = this->flipCommands ? "-1" : "1";
+  obj["payload_stop"] = "0";
+  obj["state_topic"] = "~/direction";
+  obj["state_open"] = this->flipCommands ? "1" : "-1";
+  obj["state_closed"] = this->flipCommands ? "-1" : "1";
+  obj["state_opening"] = this->flipCommands ? "1" : "-1";
+  obj["state_closing"] = this->flipCommands ? "-1" : "1";
+  obj["state_stopped"] = "0";
+  obj["optimistic"] = true;
+  obj["enabled_by_default"] = true;
+  snprintf(topic, sizeof(topic), "%s/cover/%d/config", settings.MQTT.discoTopic, this->groupId);
+  mqtt.publishDisco(topic, obj, true);  
+}
+void SomfyGroup::unpublishDisco() {
+  if(!mqtt.connected() || !settings.MQTT.pubDisco) return;
+  char topic[128] = "";
+  snprintf(topic, sizeof(topic), "%s/cover/%d/config", settings.MQTT.discoTopic, this->groupId);
+  mqtt.unpublish(topic);
+}
 void SomfyGroup::publish() {
   if(mqtt.connected()) {
     this->publish("groupId", this->groupId, true);
@@ -1640,6 +1685,7 @@ void SomfyGroup::publish() {
     this->publish("flags", this->flags, true);
     this->publish("sunSensor", this->hasSunSensor(), true);
     this->publishState();
+    this->publishDisco();
   }
 }
 char mqttTopicBuffer[55];
@@ -1686,6 +1732,11 @@ void SomfyGroup::unpublish(uint8_t id) {
     SomfyGroup::unpublish(id, "flags");
     SomfyGroup::unpublish(id, "SunSensor");
     SomfyGroup::unpublish(id, "flipCommands");
+    if(settings.MQTT.pubDisco) {
+      char topic[128] = "";
+      snprintf(topic, sizeof(topic), "%s/cover/%d/config", settings.MQTT.discoTopic, id);
+      mqtt.unpublish(topic);
+    }
   }
 }
 void SomfyGroup::unpublish(uint8_t id, const char *topic) {
